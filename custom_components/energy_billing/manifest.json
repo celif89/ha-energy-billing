@@ -1,1 +1,9 @@
-
+{
+  "domain": "energy_billing",
+  "name": "Licznik Energii RCE",
+  "documentation": "https://github.com/celif89/ha-energy-billing",
+  "version": "1.0.0",
+  "issue_tracker": "https://github.com/celif89/ha-energy-billing/issues",
+  "codeowners": ["@celif89"],
+  "iot_standard": "data_parsing"
+}
