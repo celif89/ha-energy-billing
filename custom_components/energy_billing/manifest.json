@@ -1,7 +1,7 @@
 {
   "domain": "energy_billing",
   "name": "Licznik Energii RCE",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "config_flow": true,
   "documentation": "https://github.com/celif89/ha-energy-billing",
   "issue_tracker": "https://github.com/celif89/ha-energy-billing/issues",
