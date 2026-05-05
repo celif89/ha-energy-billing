@@ -1,23 +1,21 @@
 import logging
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.event import async_track_time_change
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Konfiguracja sensorów na podstawie Config Flow."""
     import_sensor = config_entry.data.get("import_sensor")
     export_sensor = config_entry.data.get("export_sensor")
     price_sensor = config_entry.data.get("price_sensor")
     
-    # Dodajemy dwa sensory zamiast jednego
     async_add_entities([
         EnergyBillingSensor(import_sensor, export_sensor, price_sensor),
         EnergyBalanceSensor(import_sensor, export_sensor)
     ], True)
 
-class EnergyBillingBase(SensorEntity):
-    """Baza dla naszych sensorów do przechowywania stanów liczników."""
+class EnergyBillingBase(RestoreEntity, SensorEntity):
     _attr_has_entity_name = True
 
     def __init__(self, import_sensor, export_sensor):
@@ -28,7 +26,20 @@ class EnergyBillingBase(SensorEntity):
         self.last_export = None
 
     async def async_added_to_hass(self):
+        """Przywracanie stanu i ustawienie harmonogramu."""
+        await super().async_added_to_hass()
+        
+        old_state = await self.async_get_last_state()
+        if old_state is not None and old_state.state not in ['unknown', 'unavailable']:
+            try:
+                self._state = float(old_state.state)
+            except ValueError:
+                self._state = 0.0
+
+        # POWRÓT: Obliczamy tylko raz na godzinę (59:50)
         async_track_time_change(self.hass, self._update_values, minute=59, second=50)
+        
+        # Reset o północy
         async_track_time_change(self.hass, self._reset_daily, hour=0, minute=0, second=0)
 
     async def _reset_daily(self, now):
@@ -36,7 +47,6 @@ class EnergyBillingBase(SensorEntity):
         self.async_write_ha_state()
 
 class EnergyBillingSensor(EnergyBillingBase):
-    """Encja finansowa: (Export - Import) * Cena."""
     _attr_native_unit_of_measurement = "PLN"
     _attr_device_class = "monetary"
     _attr_icon = "mdi:cash-plus"
@@ -63,19 +73,18 @@ class EnergyBillingSensor(EnergyBillingBase):
                 price = float(st_price.state)
 
                 if self.last_import is not None:
-                    # Obliczamy bilans (dodatni = nadwyżka/zarobek)
                     diff_import = curr_import - self.last_import
                     diff_export = curr_export - self.last_export
+                    # Zarobek: (Eksport - Import) * Cena
                     self._state += ((diff_export - diff_import) * price)
                     self.async_write_ha_state()
 
                 self.last_import = curr_import
                 self.last_export = curr_export
-            except ValueError:
-                _LOGGER.warning("Błąd konwersji wartości na liczbę")
+            except (ValueError, TypeError):
+                _LOGGER.warning("Błąd wartości sensora")
 
 class EnergyBalanceSensor(EnergyBillingBase):
-    """Encja bilansu energii: Export - Import (kWh)."""
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = "energy"
     _attr_icon = "mdi:scale-balance"
@@ -106,5 +115,5 @@ class EnergyBalanceSensor(EnergyBillingBase):
 
                 self.last_import = curr_import
                 self.last_export = curr_export
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
