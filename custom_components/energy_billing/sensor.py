@@ -1,59 +1,48 @@
-import logging
-from datetime import timedelta
-from homeassistant.helpers.event import async_track_time_change
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import UnitOfEnergy, CURRENCY_EURO # Zmienimy na PLN w stanie
+from homeassistant.helpers.event import async_track_time_change
 
-_LOGGER = logging.getLogger(__name__)
-
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    async_add_entities([EnergyBillingSensor()], True)
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    # Pobieramy dane zapisane w okienkach
+    import_sensor = config_entry.data.get("import_sensor")
+    export_sensor = config_entry.data.get("export_sensor")
+    price_sensor = config_entry.data.get("price_sensor")
+    
+    async_add_entities([EnergyBillingSensor(import_sensor, export_sensor, price_sensor)], True)
 
 class EnergyBillingSensor(SensorEntity):
-    def __init__(self):
+    def __init__(self, import_sensor, export_sensor, price_sensor):
+        self._import_sensor = import_sensor
+        self._export_sensor = export_sensor
+        self._price_sensor = price_sensor
         self._attr_name = "Dzienny Zarobek RCE"
         self._attr_native_unit_of_measurement = "PLN"
-        self._attr_unique_id = "energy_billing_rce_daily"
+        self._attr_unique_id = f"rce_billing_{import_sensor}"
         self._state = 0.0
-        # Przechowujemy stany z poprzedniej godziny do obliczenia bilansu
         self.last_import = None
         self.last_export = None
 
-    @property
-    def state(self):
-        return round(self._state, 2)
-
     async def async_added_to_hass(self):
-        # Wyzwalacz: 59 minuta i 50 sekunda każdej godziny
         async_track_time_change(self.hass, self._update_billing, minute=59, second=50)
-        # Wyzwalacz: Północ (resetowanie licznika)
         async_track_time_change(self.hass, self._reset_daily, hour=0, minute=0, second=0)
 
     async def _update_billing(self, now):
-        try:
-            # Pobieramy aktualne stany liczników FoxESS
-            current_import = float(self.hass.states.get("sensor.foxess_grid_consumption").state)
-            current_export = float(self.hass.states.get("sensor.foxess_feedin").state)
-            cena = float(self.hass.states.get("sensor.rce_pse_cena_sprzedazy_prosument").state)
+        st_import = self.hass.states.get(self._import_sensor)
+        st_export = self.hass.states.get(self._export_sensor)
+        st_price = self.hass.states.get(self._price_sensor)
 
-            if self.last_import is not None and self.last_export is not None:
-                # Obliczamy ile przybyło w ciągu ostatniej godziny
-                diff_import = current_import - self.last_import
-                diff_export = current_export - self.last_export
-                
-                # Bilans netto godziny
-                bilans_godzinowy = diff_import - diff_export
-                
-                # Dodajemy do sumy dobowej (Bilans * Cena)
-                self._state += (bilans_godzinowy * cena)
+        if st_import and st_export and st_price:
+            curr_import = float(st_import.state)
+            curr_export = float(st_export.state)
+            price = float(st_price.state)
+
+            if self.last_import is not None:
+                diff_import = curr_import - self.last_import
+                diff_export = curr_export - self.last_export
+                self._state += ((diff_import - diff_export) * price)
                 self.async_write_ha_state()
 
-            # Zapamiętujemy stany na następną godzinę
-            self.last_import = current_import
-            self.last_export = current_export
-
-        except Exception as e:
-            _LOGGER.error("Błąd przy obliczaniu bilansu energii: %s", e)
+            self.last_import = curr_import
+            self.last_export = curr_export
 
     async def _reset_daily(self, now):
         self._state = 0.0
