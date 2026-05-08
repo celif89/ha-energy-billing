@@ -32,28 +32,23 @@ class EnergyBase(RestoreEntity, SensorEntity):
             try: self._state = float(old_state.state)
             except ValueError: self._state = 0.0
         
-        # Główny wyzwalacz obliczeń (59:50)
         async_track_time_change(self.hass, self._update_values, minute=59, second=50)
-        
-        # NOWOŚĆ: Synchronizacja o północy, aby uniknąć skoków (00:00:01)
         async_track_time_change(self.hass, self._sync_at_midnight, hour=0, minute=0, second=1)
 
     async def _sync_at_midnight(self, now):
-        """Resetujemy stany 'last' bez dodawania różnicy do wyniku."""
         st_i = self.hass.states.get(self._import_sensor)
         st_e = self.hass.states.get(self._export_sensor)
         if st_i and st_e:
             try:
                 self.last_import = float(st_i.state)
                 self.last_export = float(st_e.state)
-                _LOGGER.info("Zsynchronizowano liczniki RCE po północy")
-            except (ValueError, TypeError):
-                pass
+            except (ValueError, TypeError): pass
 
     @property
     def native_value(self): return round(self._state, 3)
 
 class EnergyDailyMoneySensor(EnergyBase):
+    """Suma PLN z eksportu nadwyżek (zarobek)."""
     _attr_native_unit_of_measurement = "PLN"
     _attr_device_class = "monetary"
     _attr_icon = "mdi:cash-plus"
@@ -79,15 +74,20 @@ class EnergyDailyMoneySensor(EnergyBase):
             try:
                 curr_i, curr_e, p = float(st_i.state), float(st_e.state), float(st_p.state)
                 if self.last_import is not None:
-                    # Obsługa ewentualnego resetu sensora w ciągu godziny
                     diff_e = max(0, curr_e - self.last_export)
                     diff_i = max(0, curr_i - self.last_import)
-                    self._state += (diff_e - diff_i) * p
+                    hourly_balance = diff_e - diff_i
+                    
+                    # POPRAWKA: Zarabiamy tylko gdy bilans jest dodatni
+                    if hourly_balance > 0:
+                        self._state += hourly_balance * p
+                    
                     self.async_write_ha_state()
                 self.last_import, self.last_export = curr_i, curr_e
             except: pass
 
 class EnergyHourlyBalanceSensor(EnergyBase):
+    """Bilans kWh z ostatniej godziny (może być ujemny)."""
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = "energy"
     _attr_icon = "mdi:clock-outline"
@@ -103,7 +103,6 @@ class EnergyHourlyBalanceSensor(EnergyBase):
             try:
                 curr_i, curr_e = float(st_i.state), float(st_e.state)
                 if self.last_import is not None:
-                    # Obliczamy tylko różnicę z ostatniej godziny
                     diff_e = max(0, curr_e - self.last_export)
                     diff_i = max(0, curr_i - self.last_import)
                     self._state = diff_e - diff_i
@@ -112,6 +111,7 @@ class EnergyHourlyBalanceSensor(EnergyBase):
             except: pass
 
 class EnergyDailyBalanceSensor(EnergyBase):
+    """Suma kWh netto od północy."""
     _attr_native_unit_of_measurement = "kWh"
     _attr_device_class = "energy"
     _attr_icon = "mdi:scale-balance"
