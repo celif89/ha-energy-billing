@@ -1,10 +1,13 @@
 {
   "domain": "energy_billing",
   "name": "Licznik Energii RCE",
-  "version": "1.5.0",
-  "config_flow": true,
-  "documentation": "https://github.com/celif89/ha-energy-billing",
-  "issue_tracker": "https://github.com/celif89/ha-energy-billing/issues",
   "codeowners": ["@celif89"],
-  "iot_standard": "data_parsing"
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/celif89/ha-energy-billing",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/celif89/ha-energy-billing/issues",
+  "requirements": [],
+  "version": "1.6.0"
 }
