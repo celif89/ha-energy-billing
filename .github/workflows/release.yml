@@ -1,0 +1,30 @@
+name: Release
+
+# Wypchnięcie tagu vX.Y.Z publikuje wydanie na GitHubie, które HACS
+# pokazuje jako aktualizację.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sprawdź zgodność tagu z wersją w manifest.json
+        run: |
+          manifest_version=$(jq -r .version custom_components/energy_billing/manifest.json)
+          if [ "v${manifest_version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} nie zgadza się z wersją ${manifest_version} w manifest.json"
+            exit 1
+          fi
+
+      - name: Opublikuj wydanie
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes --verify-tag

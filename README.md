@@ -38,6 +38,14 @@ Sensory można później zmienić w opcjach integracji (*Konfiguruj*).
 - **Spadek licznika** (wymiana/zerowanie) – przyrost jest liczony jako 0,
   z ostrzeżeniem w logu.
 
+## Wydawanie nowej wersji
+
+1. Podbij `version` w `custom_components/energy_billing/manifest.json` (np. `1.7.0`).
+2. Po zmergowaniu do `main` wypchnij tag z tą samą wersją:
+   `git tag v1.7.0 && git push origin v1.7.0`.
+3. Workflow *Release* sprawdzi zgodność tagu z manifestem i opublikuje wydanie,
+   które HACS pokaże jako aktualizację.
+
 ## Testy
 
 ```bash
