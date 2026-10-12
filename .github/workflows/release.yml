@@ -1,11 +1,13 @@
 name: Release
 
-# Wypchnięcie tagu vX.Y.Z publikuje wydanie na GitHubie, które HACS
-# pokazuje jako aktualizację.
+# Każda zmiana na main z nową wersją w manifest.json publikuje wydanie vX.Y.Z
+# (razem z tagiem), które HACS pokazuje jako aktualizację. Jeśli wydanie dla
+# tej wersji już istnieje, nic się nie dzieje.
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,15 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sprawdź zgodność tagu z wersją w manifest.json
-        run: |
-          manifest_version=$(jq -r .version custom_components/energy_billing/manifest.json)
-          if [ "v${manifest_version}" != "${GITHUB_REF_NAME}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} nie zgadza się z wersją ${manifest_version} w manifest.json"
-            exit 1
-          fi
-
-      - name: Opublikuj wydanie
+      - name: Opublikuj wydanie dla wersji z manifest.json
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --generate-notes --verify-tag
+        run: |
+          tag="v$(jq -r .version custom_components/energy_billing/manifest.json)"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            echo "Wydanie $tag już istnieje - pomijam."
+            exit 0
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "$tag" --generate-notes
