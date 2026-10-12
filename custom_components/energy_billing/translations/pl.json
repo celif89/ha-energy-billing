@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Licznik Energii RCE",
+        "description": "Wybierz liczniki energii (narastające, w kWh) oraz sensor ceny RCE.",
+        "data": {
+          "import_sensor": "Licznik energii pobranej z sieci",
+          "export_sensor": "Licznik energii oddanej do sieci",
+          "price_sensor": "Sensor ceny RCE (PLN/kWh lub PLN/MWh)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Licznik poboru i oddania muszą być różnymi encjami."
+    },
+    "abort": {
+      "already_configured": "Ta para liczników jest już skonfigurowana."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zmiana sensorów",
+        "data": {
+          "import_sensor": "Licznik energii pobranej z sieci",
+          "export_sensor": "Licznik energii oddanej do sieci",
+          "price_sensor": "Sensor ceny RCE (PLN/kWh lub PLN/MWh)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Licznik poboru i oddania muszą być różnymi encjami."
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "RCE Energy Billing",
+        "description": "Select the cumulative energy meters (kWh) and the RCE price sensor.",
+        "data": {
+          "import_sensor": "Grid import energy meter",
+          "export_sensor": "Grid export energy meter",
+          "price_sensor": "RCE price sensor (PLN/kWh or PLN/MWh)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Import and export meters must be different entities."
+    },
+    "abort": {
+      "already_configured": "This pair of meters is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Change sensors",
+        "data": {
+          "import_sensor": "Grid import energy meter",
+          "export_sensor": "Grid export energy meter",
+          "price_sensor": "RCE price sensor (PLN/kWh or PLN/MWh)"
+        }
+      }
+    },
+    "error": {
+      "same_sensor": "Import and export meters must be different entities."
+    }
+  }
+}
