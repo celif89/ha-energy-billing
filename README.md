@@ -8,6 +8,7 @@ godzinowym według ceny RCE.
 | Encja | Opis |
 |---|---|
 | Dzienny zarobek (PLN) | Suma po godzinach: dodatni bilans godziny × cena RCE. Zerowana o północy. |
+| Miesięczny zarobek (PLN) | Jak dzienny zarobek, ale sumowany przez cały miesiąc. Zerowany 1. dnia miesiąca o północy. |
 | Godzinowy bilans energii (kWh) | Energia oddana − pobrana w ostatnim okresie rozliczeniowym. |
 | Dzienny bilans energii (kWh) | Suma bilansów godzinowych z doby. Zerowana o północy. |
 | Bieżący bilans godzinowy (kWh) | Bilans trwającego okresu, odświeżany co 2 minuty. |

@@ -19,7 +19,7 @@ from .conftest import EXPORT, IMPORT, PRICE
 
 pytestmark = pytest.mark.usefixtures("warsaw")
 
-KEYS = ("money_daily", "energy_hourly", "energy_daily", "hour_progress")
+KEYS = ("money_daily", "money_monthly", "energy_hourly", "energy_daily", "hour_progress")
 
 
 def at(text: str) -> datetime:
@@ -72,6 +72,7 @@ async def test_hourly_settlement(hass, freezer, config_entry):
     assert value(hass, e["energy_hourly"]) == 2.5
     assert value(hass, e["energy_daily"]) == 2.5
     assert value(hass, e["money_daily"]) == 1.25
+    assert value(hass, e["money_monthly"]) == 1.25
     assert value(hass, e["hour_progress"]) == 0.0
 
     # Godzina z przewagą poboru: bilans ujemny, zarobek bez zmian.
@@ -142,6 +143,7 @@ async def test_midnight(hass, freezer, config_entry):
     await hass.async_block_till_done()
     assert value(hass, e["energy_daily"]) == 0.0
     assert value(hass, e["money_daily"]) == 0.0
+    assert value(hass, e["money_monthly"]) == 1.0  # miesiąc trwa dalej
 
     # Okres 23:59:50-00:59:50 należy w całości do nowej doby (bez luki o północy).
     meters(hass, 100.0, 53.0)
@@ -227,3 +229,33 @@ async def test_legacy_unique_ids_migrated(hass, freezer, config_entry):
     migrated = reg.async_get(old.entity_id)
     assert migrated.unique_id == "test_entry_money_daily"
     assert hass.states.get("sensor.dzienny_zarobek_rce") is not None
+
+
+async def test_monthly_money_resets_on_first_day(hass, freezer, config_entry):
+    meters(hass, 100.0, 50.0)
+    freezer.move_to(dt_util.parse_datetime("2026-03-31T21:30:00+02:00"))
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    e = ids(hass)
+
+    async def tick_dt(text):
+        freezer.move_to(dt_util.parse_datetime(text))
+        async_fire_time_changed(hass, dt_util.utcnow())
+        await hass.async_block_till_done()
+
+    await tick_dt("2026-03-31T22:59:50+02:00")
+    meters(hass, 100.0, 54.0)
+    await tick_dt("2026-03-31T23:59:50+02:00")
+    assert value(hass, e["money_monthly"]) == 2.0
+
+    await tick_dt("2026-04-01T00:00:00+02:00")
+    assert value(hass, e["money_monthly"]) == 0.0
+    attrs = hass.states.get(e["money_monthly"]).attributes
+    assert dt_util.parse_datetime(attrs["last_reset"]) == dt_util.parse_datetime(
+        "2026-04-01T00:00:00+02:00"
+    )
+
+    meters(hass, 100.0, 55.0)
+    await tick_dt("2026-04-01T00:59:50+02:00")
+    await tick_dt("2026-04-02T00:00:00+02:00")
+    assert value(hass, e["money_monthly"]) == 0.5

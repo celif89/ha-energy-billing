@@ -19,6 +19,7 @@ MAX_SETTLEMENT_PERIOD = timedelta(minutes=70)
 
 # Klucze encji (część unique_id) i prefiksy unique_id z wersji <= 1.5.0.
 KEY_MONEY_DAILY = "money_daily"
+KEY_MONEY_MONTHLY = "money_monthly"
 KEY_ENERGY_HOURLY = "energy_hourly"
 KEY_ENERGY_DAILY = "energy_daily"
 KEY_HOUR_PROGRESS = "hour_progress"

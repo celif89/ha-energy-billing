@@ -30,6 +30,7 @@ from .const import (
     KEY_ENERGY_HOURLY,
     KEY_HOUR_PROGRESS,
     KEY_MONEY_DAILY,
+    KEY_MONEY_MONTHLY,
     MAX_SETTLEMENT_PERIOD,
     SETTLEMENT_MINUTE,
     SETTLEMENT_SECOND,
@@ -47,6 +48,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             EnergyDailyMoneySensor(entry, config),
+            EnergyMonthlyMoneySensor(entry, config),
             EnergyHourlyBalanceSensor(entry, config),
             EnergyDailyBalanceSensor(entry, config),
             EnergyCurrentHourProgressSensor(entry, config),
@@ -251,14 +253,14 @@ class EnergyBillingSensor(RestoreEntity, SensorEntity):
         raise NotImplementedError
 
 
-class DailyBillingSensor(EnergyBillingSensor):
-    """Sensor sumujący godziny w ramach doby, zerowany o północy."""
+class ResettingBillingSensor(EnergyBillingSensor):
+    """Sensor sumujący godziny w ramach doby (domyślnie), zerowany na jej początku."""
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         if self._value is None:
             self._value = 0.0
-        self._roll_day()
+        self._roll_period()
         self.async_on_remove(
             async_track_time_change(
                 self.hass, self._handle_midnight, hour=0, minute=0, second=0
@@ -267,12 +269,14 @@ class DailyBillingSensor(EnergyBillingSensor):
 
     def _restore_legacy(self, state: State) -> None:
         super()._restore_legacy(state)
-        self._attr_last_reset = dt_util.start_of_local_day(
-            dt_util.as_local(state.last_updated)
-        )
+        self._attr_last_reset = self._period_start(dt_util.as_local(state.last_updated))
 
-    def _roll_day(self) -> bool:
-        start = dt_util.start_of_local_day()
+    def _period_start(self, local_now: datetime) -> datetime:
+        """Początek okresu sumowania zawierającego podaną chwilę."""
+        return dt_util.start_of_local_day(local_now.date())
+
+    def _roll_period(self) -> bool:
+        start = self._period_start(dt_util.now())
         if self._attr_last_reset is None or self._attr_last_reset < start:
             self._value = 0.0
             self._attr_last_reset = start
@@ -281,16 +285,16 @@ class DailyBillingSensor(EnergyBillingSensor):
 
     @callback
     def _handle_midnight(self, now: datetime) -> None:
-        if self._roll_day():
+        if self._roll_period():
             self.async_write_ha_state()
 
     def _settle(self, period: Period | None) -> None:
-        self._roll_day()
+        self._roll_period()
         if period is None:
             return
         if not period.is_single_hour and period.start < self._attr_last_reset:
             _LOGGER.warning(
-                "%s: pominięto okres obejmujący północ - nie da się go przypisać do doby",
+                "%s: pominięto okres obejmujący początek doby/miesiąca - nie da się go przypisać",
                 self.entity_id,
             )
             return
@@ -300,7 +304,7 @@ class DailyBillingSensor(EnergyBillingSensor):
         raise NotImplementedError
 
 
-class EnergyDailyMoneySensor(DailyBillingSensor):
+class EnergyDailyMoneySensor(ResettingBillingSensor):
     _key = KEY_MONEY_DAILY
     _attr_name = "Dzienny zarobek"
     _attr_native_unit_of_measurement = "PLN"
@@ -334,7 +338,16 @@ class EnergyDailyMoneySensor(DailyBillingSensor):
         self._value += hourly_revenue(period.exported, period.imported, price)
 
 
-class EnergyDailyBalanceSensor(DailyBillingSensor):
+class EnergyMonthlyMoneySensor(EnergyDailyMoneySensor):
+    _key = KEY_MONEY_MONTHLY
+    _attr_name = "Miesięczny zarobek"
+    _attr_icon = "mdi:cash-multiple"
+
+    def _period_start(self, local_now: datetime) -> datetime:
+        return dt_util.start_of_local_day(local_now.date().replace(day=1))
+
+
+class EnergyDailyBalanceSensor(ResettingBillingSensor):
     _key = KEY_ENERGY_DAILY
     _attr_name = "Dzienny bilans energii"
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
